@@ -454,21 +454,32 @@ class Worker
         // 只有一个start文件时执行run
         if(count(self::$_startFiles) === 1)
         {
-            // win不支持同一个页面执初始化多个worker
-            if(count(self::$_workers) > 1)
-            {
-                echo "@@@ Error: multi workers init in one php file are not support @@@\r\n";
-                echo "@@@ Please visit http://wiki.workerman.net/Multi_woker_for_win @@@\r\n";
-            }
-            elseif(count(self::$_workers) <= 0)
+            if(count(self::$_workers) <= 0)
             {
                 exit("@@@no worker inited@@@\r\n\r\n");
             }
-            
-            // 执行worker的run方法
-            reset(self::$_workers);
-            $worker = current(self::$_workers);
-            $worker->listen();
+             // 执行worker的run方法
+            if(count(self::$_workers) == 1 )
+            {
+                reset(self::$_workers);
+                $worker = current(self::$_workers);
+                $worker->listen(); 
+            }
+            else
+            { 
+                $worker = new Worker();
+                unset(self::$_workers[$worker->workerId]);
+                $worker->onWorkerStart=function()
+                {
+                    foreach (self::$_workers as $worker) 
+                    {
+                        $worker->listen();  
+                        if($worker->onWorkerStart){
+                            \call_user_func($worker->onWorkerStart,$worker);
+                        }
+                    }  
+                }; 
+            } 
             // 子进程阻塞在这里
             $worker->run();
             exit("@@@child exit@@@\r\n");
